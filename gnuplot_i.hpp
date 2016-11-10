@@ -44,7 +44,7 @@
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__TOS_WIN__)
 //defined for 32 and 64-bit environments
-#include <io.h>                // for _access(), _mktemp()
+#include <io.h>                // for _access(), _mktemp_s()
 #define GP_MAX_TMP_FILES  27   // 27 temporary files it's Microsoft restriction
 #elif defined(unix) || defined(__unix) || defined(__unix__) || defined(__APPLE__)
 //all UNIX-like OSs (Linux, *BSD, MacOSX, Solaris, ...)
@@ -677,7 +677,7 @@ public:
 int Gnuplot::tmpfile_num = 0;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__TOS_WIN__)
-std::string Gnuplot::m_sGNUPlotFileName = "pgnuplot.exe";
+std::string Gnuplot::m_sGNUPlotFileName = "gnuplot.exe";
 std::string Gnuplot::m_sGNUPlotPath = "C:/program files/gnuplot/bin/";
 #elif defined(unix) || defined(__unix) || defined(__unix__) || defined(__APPLE__)
 std::string Gnuplot::m_sGNUPlotFileName = "gnuplot";
@@ -1860,18 +1860,19 @@ bool Gnuplot::get_program_path()
     //
     // second look in PATH for Gnuplot
     //
-    char *path;
     // Retrieves a C string containing the value of environment variable PATH
-    path = getenv("PATH");
+	size_t pathSize;
+	getenv_s(&pathSize, nullptr, 0, "PATH");
 
-
-    if (path == NULL)
-    {
+	if (pathSize == 0) 
+	{
         throw GnuplotException("Path is not set");
         return false;
-    }
-    else
-    {
+    } 
+	else 
+	{
+		char *path = (char *)malloc(pathSize * sizeof(char));
+		getenv_s(&pathSize, path, pathSize, "PATH");
         std::list<std::string> ls;
 
         //split path (one long string) into list ls of strings
@@ -1880,7 +1881,7 @@ bool Gnuplot::get_program_path()
 #elif defined(unix) || defined(__unix) || defined(__unix__) || defined(__APPLE__)
         stringtok(ls,path,":");
 #endif
-
+		free(path);
         // scan list for Gnuplot program files
         for (std::list<std::string>::const_iterator i = ls.begin();
                 i != ls.end(); ++i)
@@ -2006,7 +2007,7 @@ std::string Gnuplot::create_tmpfile(std::ofstream &tmp)
     // open temporary files for output
     //
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__TOS_WIN__)
-    if (_mktemp(name) == NULL)
+	if (_mktemp_s(name, strlen(name) + 1) != 0)
 #elif defined(unix) || defined(__unix) || defined(__unix__) || defined(__APPLE__)
     int tmpfd;
     if ((tmpfd = mkstemp(name)) == -1)
